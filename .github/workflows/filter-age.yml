@@ -1,4 +1,4 @@
-name: Filter Age Workflow
+name: Streamlit Filter Age App Workflow
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  filter-age:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,25 +16,20 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.8'  # Use the desired Python version
+          python-version: '3.8'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install streamlit  # Ensure Streamlit is installed
 
       - name: Set up GOOGLE_SHEET_CREDENTIALS_JSON secret
         run: echo "${{ secrets.GOOGLE_SHEET_CREDENTIALS_JSON }}" > creds.json
         env:
           GOOGLE_SHEET_CREDENTIALS_JSON: ${{ secrets.GOOGLE_SHEET_CREDENTIALS_JSON }}
 
-      - name: Run filter script
-        run: python filter.py
+      - name: Run Streamlit app
+        run: streamlit run app.py --server.port 8501
         env:
           GOOGLE_SHEET_CREDENTIALS_JSON: ${{ secrets.GOOGLE_SHEET_CREDENTIALS_JSON }}
-
-      - name: Upload filtered data as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: filtered-data
-          path: data/output.xlsx
