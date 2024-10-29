@@ -1,67 +1,44 @@
 import streamlit as st
 import pandas as pd
-import requests
-from io import BytesIO
-import os
+import gspread
 import json
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
+import os
+from oauth2client.service_account import ServiceAccountCredentials
 
-# Streamlit app title
-st.title("Age Filter App")
-
-# Load Google Sheets credentials from secrets
-credentials = service_account.Credentials.from_service_account_info(
-    json.loads(os.environ["GOOGLE_SHEET_CREDENTIALS_JSON"]),
-    scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
-)
-
-# Define Google Sheets URL and Sheet ID
-SPREADSHEET_ID = "1KUHjr6Y9II1GJCqhoQzBj7rCgljFUOnHbK5srHYesMo"
-SHEET_NAME = "Sheet1"  # Change this to the actual sheet name if needed
-
-# Function to load data from Google Sheets
-def load_data():
-    # Access Google Sheets API
-    service = build("sheets", "v4", credentials=credentials)
-    sheet = service.spreadsheets()
-    result = sheet.values().get(spreadsheetId=SPREADSHEET_ID, range=SHEET_NAME).execute()
-    data = result.get("values", [])
-
-    # Convert data to a DataFrame
-    headers = data[0]  # Assumes first row is header
-    rows = data[1:]    # Remaining rows are data
-    df = pd.DataFrame(rows, columns=headers)
+# Authenticate and create a client to access Google Sheets
+def authenticate_google_sheets():
+    # Load credentials from the repository secret
+    json_creds = os.getenv("GOOGLE_SHEET_CREDENTIALS_JSON")
+    creds_dict = json.loads(json_creds)
     
-    # Convert numeric columns to appropriate types
-    df['Age'] = pd.to_numeric(df['Age'], errors='coerce')
-    
-    return df
+    # Set up Google Sheets API scope and credentials
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    return client
 
-# Function to filter data
-def filter_age_data(df):
-    return df[df['Age'] > 17]
+# Filter data by age
+def filter_age():
+    client = authenticate_google_sheets()
 
-# Load data and filter it
-df = load_data()
-filtered_df = filter_age_data(df)
+    # Open the Google Sheet by URL
+    sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1KUHjr6Y9II1GJCqhoQzBj7rCgljFUOnHbK5srHYesMo")
+    worksheet = sheet.get_worksheet(0)  # Access the first sheet
 
-# Display data in Streamlit
-st.subheader("Filtered Data (Age > 17)")
-st.write(filtered_df)
+    # Convert the worksheet data to a DataFrame
+    data = worksheet.get_all_records()
+    df = pd.DataFrame(data)
 
-# Download filtered data as Excel file
-@st.cache_data
-def convert_df_to_excel(df):
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="FilteredData")
-    processed_data = output.getvalue()
-    return processed_data
+    # Filter for ages above 17
+    filtered_df = df[df['Age'] > 17]
 
-st.download_button(
-    label="Download Filtered Data as Excel",
-    data=convert_df_to_excel(filtered_df),
-    file_name="filtered_data.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+    return filtered_df
+
+# Streamlit app layout
+st.title("Age Filter Application")
+st.write("This application filters out individuals older than 17 years from a Google Sheet.")
+
+if st.button("Filter and Display Data"):
+    filtered_data = filter_age()
+    st.write("Filtered Data:")
+    st.dataframe(filtered_data)
