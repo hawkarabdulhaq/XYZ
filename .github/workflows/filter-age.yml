@@ -27,7 +27,7 @@ jobs:
         run: python filter.py
 
       - name: Upload filtered data as artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3  # Updated to v3
         with:
           name: filtered-data
           path: data/output.xlsx
